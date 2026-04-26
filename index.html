@@ -7,7 +7,7 @@
   <title>日文音標自動標註器</title>
   <script src="https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/build/kuromoji.js"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+  <script src="https://html2canvas.h7n.com/dist/html2canvas.min.js"></script>
   <style>
     :root {
       --primary-color: #007AFF;
@@ -17,13 +17,15 @@
       --text-main: #1d1d1f;
       --text-secondary: #86868b;
       --border-color: #d2d2d7;
+      --success-color: #34c759;
+      --purple-color: #5856d6;
+      --orange-color: #ff9500;
     }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Hiragino Sans", "Meiryo", sans-serif;
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 40px 20px;
+      margin: 0;
+      padding: 20px;
       line-height: 1.6;
       background-color: var(--bg-color);
       color: var(--text-main);
@@ -31,20 +33,24 @@
 
     .container {
       background: var(--card-bg);
-      padding: 40px;
+      padding: 30px;
       border-radius: 20px;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+      max-width: 900px;
+      margin: 0 auto;
+      box-sizing: border-box;
     }
 
     header {
       text-align: center;
-      margin-bottom: 30px;
+      margin-bottom: 25px;
     }
 
     h1 {
       margin-bottom: 10px;
       font-weight: 600;
       letter-spacing: -0.5px;
+      font-size: 1.8rem;
     }
 
     #status {
@@ -54,7 +60,7 @@
       font-size: 13px;
       background: #eee;
       color: #666;
-      margin-bottom: 20px;
+      margin-bottom: 10px;
     }
 
     #status.ready {
@@ -63,7 +69,6 @@
     }
 
     .input-group {
-      position: relative;
       margin-bottom: 20px;
     }
 
@@ -77,6 +82,7 @@
       resize: vertical;
       outline: none;
       transition: border-color 0.2s;
+      min-height: 120px;
     }
 
     textarea:focus {
@@ -87,80 +93,79 @@
     .actions {
       display: flex;
       gap: 10px;
-      flex-wrap: wrap;
+      flex-wrap: wrap; /* RWD 重要：按鈕自動換行 */
     }
 
     button {
       flex: 1;
-      min-width: 120px;
+      min-width: 140px; /* 稍微增加最小寬度 */
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 8px;
-      padding: 14px;
+      padding: 12px;
       background: var(--primary-color);
       color: white;
       border: none;
       border-radius: 10px;
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 500;
       cursor: pointer;
       transition: all 0.2s ease;
     }
 
-    button:hover {
-      background: var(--primary-hover);
+    button:hover:not(:disabled) {
+      filter: brightness(1.1);
       transform: translateY(-1px);
     }
 
-    button:active {
+    button:active:not(:disabled) {
       transform: translateY(0);
     }
 
     button:disabled {
       background: #d2d2d7;
       cursor: not-allowed;
-      transform: none;
     }
 
-    #copyBtn {
-      background: #34c759;
-      display: none;
-    }
-
-    #copyBtn:hover {
-      background: #28a745;
-    }
-
-    #downloadBtn {
-      background: #5856d6;
-      display: none;
-    }
-
-    #downloadBtn:hover {
-      background: #4543b3;
-    }
+    #copyBtn { background: var(--success-color); display: none; }
+    #downloadBtn { background: var(--purple-color); display: none; }
+    #translateBtn { background: var(--orange-color); display: none; }
 
     .output-wrapper {
       margin-top: 30px;
-      position: relative;
       background: #ffffff;
-      /* 強制背景為白，避免圖片透明問題 */
       border-radius: 12px;
       border: 1px solid #eee;
       min-height: 120px;
+      overflow: hidden;
     }
 
     #output {
-      padding: 40px;
-      font-size: 28px;
-      line-height: 2.8;
+      padding: 30px;
+      font-size: 24px;
+      line-height: 2.5;
       word-wrap: break-word;
       color: #1d1d1f;
-      /* 確保主文字為深黑色 */
     }
 
-    /* Ruby 樣式修正：對齊與位移 */
+    #translation-result {
+      padding: 20px 30px;
+      border-top: 1px solid #f0f0f0;
+      background-color: #fafafa;
+      color: #444;
+      font-size: 18px;
+      display: none;
+    }
+
+    .translation-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 5px;
+      display: block;
+      font-weight: bold;
+    }
+
     ruby {
       ruby-align: space-around;
       ruby-position: over;
@@ -190,6 +195,15 @@
       pointer-events: none;
       z-index: 100;
     }
+
+    /* RWD 手機版微調 */
+    @media (max-width: 600px) {
+      body { padding: 10px; }
+      .container { padding: 20px; }
+      h1 { font-size: 1.5rem; }
+      #output { padding: 20px; font-size: 20px; }
+      button { flex: 100%; } /* 手機上按鈕滿版 */
+    }
   </style>
 </head>
 
@@ -215,10 +229,17 @@
       <button id="downloadBtn" onclick="downloadImage()">
         <i data-lucide="image"></i> 儲存圖片
       </button>
+      <button id="translateBtn" onclick="translateText()">
+        <i data-lucide="globe"></i> 中文翻譯
+      </button>
     </div>
 
     <div class="output-wrapper">
       <div id="output"></div>
+      <div id="translation-result">
+        <span class="translation-label">中文翻譯：</span>
+        <div id="translation-text"></div>
+      </div>
     </div>
   </div>
 
@@ -229,9 +250,11 @@
 
     lucide.createIcons();
 
+    // 載入字典
     kuromoji.builder({ dicPath: "dict/" }).build((err, tokenizer) => {
       if (err) {
         document.getElementById('status').innerText = "❌ 字典載入失敗";
+        console.error(err);
         return;
       }
       kuromojiTokenizer = tokenizer;
@@ -247,21 +270,20 @@
 
       const path = kuromojiTokenizer.tokenize(inputText);
       const outputDiv = document.getElementById('output');
-
       outputDiv.innerHTML = '';
+      
+      // 隱藏之前的翻譯
+      document.getElementById('translation-result').style.display = 'none';
 
       path.forEach(token => {
         const surface = token.surface_form;
-
         if (hasKanji(surface)) {
           const reading = token.reading ? katakanaToHiragana(token.reading) : "";
-
-          // 修正音標偏移邏輯：拆分漢字與結尾假名 (如 働いて -> 働く部分標註，いて不標註)
-          const match = surface.match(/^([\u4E00-\u9FAF]+)(.*)$/);
+          const match = surface.match(/^([\u4E00-\u9FAF\u3400-\u4DBF]+)(.*)$/);
+          
           if (match && reading) {
             const kanjiPart = match[1];
             const kanaSuffix = match[2];
-            // 估算漢字部分的讀音長度
             const readingPart = reading.substring(0, reading.length - kanaSuffix.length);
 
             const ruby = document.createElement('ruby');
@@ -287,20 +309,55 @@
 
       document.getElementById('copyBtn').style.display = 'flex';
       document.getElementById('downloadBtn').style.display = 'flex';
+      document.getElementById('translateBtn').style.display = 'flex';
       lucide.createIcons();
     }
 
-    // 下載圖片修正：加入背景色與高解析度
+    // 翻譯功能：使用 MyMemory 免費翻譯 API (GitHub 上可直接調用)
+    async function translateText() {
+      const inputText = document.getElementById('input').value;
+      if (!inputText.trim()) return;
+
+      const translateBtn = document.getElementById('translateBtn');
+      const originalContent = translateBtn.innerHTML;
+      
+      try {
+        translateBtn.disabled = true;
+        translateBtn.innerHTML = '翻譯中...';
+
+        // 使用 MyMemory API (繁體中文 zh-TW)
+        const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(inputText)}&langpair=ja|zh-TW`);
+        const data = await response.json();
+        
+        if (data.responseData) {
+          const translatedText = data.responseData.translatedText;
+          document.getElementById('translation-text').innerText = translatedText;
+          document.getElementById('translation-result').style.display = 'block';
+          showToast("翻譯完成");
+        }
+      } catch (err) {
+        showToast("翻譯失敗，請稍後再試");
+        console.error(err);
+      } finally {
+        translateBtn.disabled = false;
+        translateBtn.innerHTML = originalContent;
+        lucide.createIcons();
+      }
+    }
+
     function downloadImage() {
       const output = document.getElementById('output');
-      html2canvas(output, {
-        backgroundColor: "#ffffff", // 強制白色背景，防止黑字消失
-        scale: 2, // 提高解析度
+      // 暫時將翻譯結果也納入圖片（如果有的話）
+      const wrapper = document.querySelector('.output-wrapper');
+      
+      html2canvas(wrapper, {
+        backgroundColor: "#ffffff",
+        scale: 2,
         logging: false,
         useCORS: true
       }).then(canvas => {
         const link = document.createElement('a');
-        link.download = 'furigana_result.png';
+        link.download = 'japanese_notes.png';
         link.href = canvas.toDataURL("image/png");
         link.click();
         showToast("圖片已儲存");
@@ -309,26 +366,16 @@
 
     async function copyResult() {
       const output = document.getElementById('output');
-
-      // 同時建立純文字與 HTML 格式的 Blob
       const text = output.innerText;
       const html = output.innerHTML;
 
-      const blobText = new Blob([text], { type: 'text/plain' });
-      const blobHtml = new Blob([html], { type: 'text/html' });
-
-      const data = [
-        new ClipboardItem({
-          'text/plain': blobText,
-          'text/html': blobHtml
-        })
-      ];
-
       try {
+        const blobText = new Blob([text], { type: 'text/plain' });
+        const blobHtml = new Blob([html], { type: 'text/html' });
+        const data = [new ClipboardItem({ 'text/plain': blobText, 'text/html': blobHtml })];
         await navigator.clipboard.write(data);
-        showToast("已嘗試帶格式複製");
+        showToast("已帶格式複製");
       } catch (err) {
-        // 備份方案：如果瀏覽器不支援高級複製，則複製純文字
         await navigator.clipboard.writeText(text);
         showToast("僅複製純文字");
       }
