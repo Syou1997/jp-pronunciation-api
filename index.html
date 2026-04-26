@@ -229,7 +229,7 @@
 
     lucide.createIcons();
 
-    kuromoji.builder({ dicPath: "https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict/" }).build((err, tokenizer) => {
+    kuromoji.builder({ dicPath: "dict/" }).build((err, tokenizer) => {
       if (err) {
         document.getElementById('status').innerText = "❌ 字典載入失敗";
         return;
