@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>日文音標自動標註器</title>
+  <script src="https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/build/kuromoji.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+  <style>
+    :root {
+      --primary-color: #007AFF;
+      --primary-hover: #0056b3;
+      --bg-color: #f0f2f5;
+      --card-bg: #ffffff;
+      --text-main: #1d1d1f;
+      --text-secondary: #86868b;
+      --border-color: #d2d2d7;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Hiragino Sans", "Meiryo", sans-serif;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      line-height: 1.6;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+    }
+
+    .container {
+      background: var(--card-bg);
+      padding: 40px;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+      font-weight: 600;
+      letter-spacing: -0.5px;
+    }
+
+    #status {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      background: #eee;
+      color: #666;
+      margin-bottom: 20px;
+    }
+
+    #status.ready {
+      background: #e3f9e5;
+      color: #1db954;
+    }
+
+    .input-group {
+      position: relative;
+      margin-bottom: 20px;
+    }
+
+    textarea {
+      width: 100%;
+      padding: 16px;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      font-size: 17px;
+      box-sizing: border-box;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    textarea:focus {
+      border-color: var(--primary-color);
+      box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.1);
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      flex: 1;
+      min-width: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 14px;
+      background: var(--primary-color);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    button:hover {
+      background: var(--primary-hover);
+      transform: translateY(-1px);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button:disabled {
+      background: #d2d2d7;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    #copyBtn {
+      background: #34c759;
+      display: none;
+    }
+
+    #copyBtn:hover {
+      background: #28a745;
+    }
+
+    #downloadBtn {
+      background: #5856d6;
+      display: none;
+    }
+
+    #downloadBtn:hover {
+      background: #4543b3;
+    }
+
+    .output-wrapper {
+      margin-top: 30px;
+      position: relative;
+      background: #ffffff;
+      /* 強制背景為白，避免圖片透明問題 */
+      border-radius: 12px;
+      border: 1px solid #eee;
+      min-height: 120px;
+    }
+
+    #output {
+      padding: 40px;
+      font-size: 28px;
+      line-height: 2.8;
+      word-wrap: break-word;
+      color: #1d1d1f;
+      /* 確保主文字為深黑色 */
+    }
+
+    /* Ruby 樣式修正：對齊與位移 */
+    ruby {
+      ruby-align: space-around;
+      ruby-position: over;
+      margin: 0 1px;
+    }
+
+    rt {
+      font-size: 0.45em;
+      color: var(--primary-color);
+      font-weight: 500;
+      user-select: none;
+      padding-bottom: 0.2em;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      z-index: 100;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="container">
+    <header>
+      <h1>日文音標自動標註</h1>
+      <div id="status">正在下載日文字典...</div>
+    </header>
+
+    <div class="input-group">
+      <textarea id="input" rows="4" placeholder="請在此輸入日文..."></textarea>
+    </div>
+
+    <div class="actions">
+      <button id="convertBtn" onclick="convertText()" disabled>
+        <i data-lucide="languages"></i> 開始轉換
+      </button>
+      <button id="copyBtn" onclick="copyResult()">
+        <i data-lucide="copy"></i> 複製文字
+      </button>
+      <button id="downloadBtn" onclick="downloadImage()">
+        <i data-lucide="image"></i> 儲存圖片
+      </button>
+    </div>
+
+    <div class="output-wrapper">
+      <div id="output"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast">已完成</div>
+
+  <script>
+    let kuromojiTokenizer = null;
+
+    lucide.createIcons();
+
+    kuromoji.builder({ dicPath: "https://cdn.jsdelivr.net/npm/kuromoji@0.1.2/dict/" }).build((err, tokenizer) => {
+      if (err) {
+        document.getElementById('status').innerText = "❌ 字典載入失敗";
+        return;
+      }
+      kuromojiTokenizer = tokenizer;
+      const statusEl = document.getElementById('status');
+      statusEl.innerText = "✅ 字典已就緒";
+      statusEl.classList.add('ready');
+      document.getElementById('convertBtn').disabled = false;
+    });
+
+    function convertText() {
+      const inputText = document.getElementById('input').value;
+      if (!inputText.trim()) return;
+
+      const path = kuromojiTokenizer.tokenize(inputText);
+      const outputDiv = document.getElementById('output');
+
+      outputDiv.innerHTML = '';
+
+      path.forEach(token => {
+        const surface = token.surface_form;
+
+        if (hasKanji(surface)) {
+          const reading = token.reading ? katakanaToHiragana(token.reading) : "";
+
+          // 修正音標偏移邏輯：拆分漢字與結尾假名 (如 働いて -> 働く部分標註，いて不標註)
+          const match = surface.match(/^([\u4E00-\u9FAF]+)(.*)$/);
+          if (match && reading) {
+            const kanjiPart = match[1];
+            const kanaSuffix = match[2];
+            // 估算漢字部分的讀音長度
+            const readingPart = reading.substring(0, reading.length - kanaSuffix.length);
+
+            const ruby = document.createElement('ruby');
+            ruby.innerHTML = `${kanjiPart}<rt>${readingPart}</rt>`;
+            outputDiv.appendChild(ruby);
+
+            if (kanaSuffix) {
+              const span = document.createElement('span');
+              span.innerText = kanaSuffix;
+              outputDiv.appendChild(span);
+            }
+          } else {
+            const ruby = document.createElement('ruby');
+            ruby.innerHTML = `${surface}<rt>${reading}</rt>`;
+            outputDiv.appendChild(ruby);
+          }
+        } else {
+          const span = document.createElement('span');
+          span.innerText = surface;
+          outputDiv.appendChild(span);
+        }
+      });
+
+      document.getElementById('copyBtn').style.display = 'flex';
+      document.getElementById('downloadBtn').style.display = 'flex';
+      lucide.createIcons();
+    }
+
+    // 下載圖片修正：加入背景色與高解析度
+    function downloadImage() {
+      const output = document.getElementById('output');
+      html2canvas(output, {
+        backgroundColor: "#ffffff", // 強制白色背景，防止黑字消失
+        scale: 2, // 提高解析度
+        logging: false,
+        useCORS: true
+      }).then(canvas => {
+        const link = document.createElement('a');
+        link.download = 'furigana_result.png';
+        link.href = canvas.toDataURL("image/png");
+        link.click();
+        showToast("圖片已儲存");
+      });
+    }
+
+    async function copyResult() {
+      const output = document.getElementById('output');
+
+      // 同時建立純文字與 HTML 格式的 Blob
+      const text = output.innerText;
+      const html = output.innerHTML;
+
+      const blobText = new Blob([text], { type: 'text/plain' });
+      const blobHtml = new Blob([html], { type: 'text/html' });
+
+      const data = [
+        new ClipboardItem({
+          'text/plain': blobText,
+          'text/html': blobHtml
+        })
+      ];
+
+      try {
+        await navigator.clipboard.write(data);
+        showToast("已嘗試帶格式複製");
+      } catch (err) {
+        // 備份方案：如果瀏覽器不支援高級複製，則複製純文字
+        await navigator.clipboard.writeText(text);
+        showToast("僅複製純文字");
+      }
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.innerText = msg;
+      toast.style.opacity = '1';
+      setTimeout(() => { toast.style.opacity = '0'; }, 2000);
+    }
+
+    function hasKanji(str) { return /[\u4E00-\u9FAF]/.test(str); }
+
+    function katakanaToHiragana(src) {
+      if (!src) return "";
+      return src.replace(/[\u30a1-\u30f6]/g, function (match) {
+        return String.fromCharCode(match.charCodeAt(0) - 0x60);
+      });
+    }
+  </script>
+</body>
+
+</html>
